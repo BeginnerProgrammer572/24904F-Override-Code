@@ -1,0 +1,7 @@
+.pio/
+bin/
+obj/
+compile_commands.json
+.vscode/
+*.o
+*.d
