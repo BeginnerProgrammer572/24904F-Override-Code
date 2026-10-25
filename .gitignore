@@ -1,7 +1,17 @@
-.pio/
-bin/
-obj/
-compile_commands.json
-.vscode/
+# Compiled Object files
 *.o
-*.d
+*.obj
+
+# Executables
+*.bin
+*.elf
+
+# PROS
+bin/
+.vscode/
+.cache/
+compile_commands.json
+temp.log
+temp.errors
+*.ini
+.d/
