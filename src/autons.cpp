@@ -375,4 +375,12 @@ void measure_offsets() {
 
 // . . .
 // Make your own autonomous functions here!
+void CloseSideAuton() {
+  chassis.pid_drive_set(36_in, 80, true);
+  chassis.pid_wait();
+  chassis.pid_turn_set(90_deg, 90);
+  chassis.pid_wait();
+  chassis.pid_drive_set(24_in, 80, true);
+  chassis.pid_wait();
+}
 // . . .
