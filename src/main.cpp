@@ -56,6 +56,10 @@ void initialize() {
   // These are already defaulted to these buttons, but you can change the left/right curve buttons here!
   // chassis.opcontrol_curve_buttons_left_set(pros::E_CONTROLLER_DIGITAL_LEFT, pros::E_CONTROLLER_DIGITAL_RIGHT);  // If using tank, only the left side is used.
   // chassis.opcontrol_curve_buttons_right_set(pros::E_CONTROLLER_DIGITAL_Y, pros::E_CONTROLLER_DIGITAL_A);
+    claw.set(CLAW_CLOSED); //claw closed
+    claw_vert.set(VERT_IN); //vert retracted
+    l_lift.tare_position(); //lift position counts as zero
+    r_lift.tare_position();
 
   // Autonomous Selector using LLEMU
   ez::as::auton_selector.autons_add({
@@ -188,6 +192,7 @@ void ez_screen_task() {
   }
 }
 pros::Task ezScreenTask(ez_screen_task);
+pros::Task liftTask(lift_task);
 
 /**
  * Gives you some extras to run in your opcontrol:
@@ -240,6 +245,34 @@ void ez_template_extras() {
  * operator control task will be stopped. Re-enabling the robot will restart the
  * task, not resume it from where it left off.
  */
+
+void lift_control() {
+  ez::screen_print("Lift: " + util::to_string_with_precision(lift_pos()), 3);
+  static uint32_t still_since = 0;
+  if (master.get_digital(DIGITAL_R2) && lift_pos() < LIFT_CEILING) {   // up, stops at the ceiling
+    lift_manual = true;
+    lift_move(120);                                     // ~90% speed
+    still_since = 0;
+  } else if (master.get_digital(DIGITAL_R1)) {          // down, slower
+    lift_manual = true;
+    if (fabs(l_lift.get_actual_velocity()) < 2) {       // stopped = resting on the stoppers
+      if (still_since == 0) still_since = pros::millis();
+      if (pros::millis() - still_since > 150) {
+        lift_move(0);
+        l_lift.tare_position();
+        r_lift.tare_position();                         // re-zero on the stoppers
+        return;
+      }
+    } else {
+      still_since = 0;
+    }
+    lift_move(-85);                                     // ~60% descent, tune this
+  } else if (lift_manual) {                             // button released: hold here
+    lift_set(lift_pos());
+    still_since = 0;
+  }
+}
+
 void opcontrol() {
   // This is preference to what you like to drive on
   chassis.drive_brake_set(MOTOR_BRAKE_COAST);
@@ -254,6 +287,13 @@ void opcontrol() {
     // chassis.opcontrol_arcade_flipped(ez::SPLIT);    // Flipped split arcade
     // chassis.opcontrol_arcade_flipped(ez::SINGLE);   // Flipped single arcade
 
+    lift_control();
+    if (master.get_digital_new_press(DIGITAL_L1)) claw.set(CLAW_OPEN);        // L1 opens
+    if (master.get_digital_new_press(DIGITAL_L2)) claw.set(CLAW_CLOSED);      // L2 closes
+    if (master.get_digital_new_press(DIGITAL_Y)) claw_vert.set(VERT_OUT);     // Y releases
+    if (master.get_digital_new_press(DIGITAL_A) &&
+      !(claw.get() == CLAW_OPEN && lift_pos() > LIFT_CEILING_CLAW_OPEN))
+      claw_vert.set(VERT_IN);
     // . . .
     // Put more user control code here!
     // . . .

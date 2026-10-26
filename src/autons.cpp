@@ -375,12 +375,58 @@ void measure_offsets() {
 
 // . . .
 // Make your own autonomous functions here!
+
+const double TOGGLE_OUT_IN = 4;
+const double TOGGLE_BACK_IN = 7;
+const double SCORE_FWD_IN = 6;
+const double SCORE_BACK_IN = 15;
+
+
 void CloseSideAuton() {
-  chassis.pid_drive_set(36_in, 80, true);
+  // Pull the pin off the wall, raise the lift, then return to the toggle
+  chassis.pid_drive_set(3_in, 85, true);
   chassis.pid_wait();
-  chassis.pid_turn_set(90_deg, 90);
+
+  lift_set(LIFT_UP_SMALL);
+  lift_wait(300, 800);    // wait until the lift is within 300 degrees of the target (about 300 or higher),
+                          // or 0.8 seconds at most, so the pin is clear of the wall
+
+  chassis.pid_drive_set(-2_in, 85, true);   // back to the toggle contact point
   chassis.pid_wait();
-  chassis.pid_drive_set(24_in, 80, true);
+
+  // Toggles: out and back, twice (unchanged)
+  for (int i = 0; i < 2; i++) { 
+    chassis.pid_drive_set(TOGGLE_OUT_IN * 1_in, 80, true);
+    chassis.pid_wait();
+    chassis.pid_drive_set(-TOGGLE_BACK_IN * 1_in, 110, false);
+    chassis.pid_wait();
+  }
+
+  // Raise the lift a bit and release the vert
+  lift_set(LIFT_UP_SMALL);
+  claw_vert.set(VERT_OUT);
+
+  // Drive forward, then swing left as one blended motion
+  chassis.pid_drive_set(SCORE_FWD_IN * 1_in, 95, true);
+  chassis.pid_wait_quick_chain();
+  chassis.pid_swing_set(ez::RIGHT_SWING, -90_deg, 90);
   chassis.pid_wait();
+
+  // Back into the goal with the lift fully up
+  chassis.pid_drive_set(-SCORE_BACK_IN * 1_in, 95, true);
+  chassis.pid_wait();
+  lift_wait();
+
+  // Scoot forward 1 inch while the lift goes down to rest, then release the claw
+  lift_set(LIFT_FLOOR);
+  chassis.pid_drive_set(3_in, 85, true);
+  chassis.pid_wait();
+  claw.set(CLAW_OPEN);
+  pros::delay(30);
+
+  // Forward 6 inches, and make sure the lift is down
+  chassis.pid_drive_set(9_in, 85, true);
+  chassis.pid_wait();
+  lift_set(LIFT_FLOOR);
+  lift_wait(40);
 }
-// . . .
