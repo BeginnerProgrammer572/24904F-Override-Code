@@ -34,6 +34,13 @@ inline void lift_task() {
 }
 
 inline void lift_set(double target) { lift_manual = false; liftPID.target_set(target); }
+inline void lift_drop() {          // let the lift fall on coast
+    lift_manual = true;              // stop the PID from driving it
+    l_lift.set_brake_mode(pros::E_MOTOR_BRAKE_COAST);
+    r_lift.set_brake_mode(pros::E_MOTOR_BRAKE_COAST);
+    lift_move(0);
+}
+inline const double LIFT_PICKUP_CLEAR = 150;   // TODO: "a bit" so the pin doesn't drag
 inline void lift_wait(double tolerance = 15, int timeout_ms = 2000) {
   uint32_t start = pros::millis();
   while (fabs(liftPID.target_get() - lift_pos()) > tolerance && pros::millis() - start < timeout_ms)
