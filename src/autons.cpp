@@ -376,57 +376,143 @@ void measure_offsets() {
 // . . .
 // Make your own autonomous functions here!
 
+// ---------- Start mode ----------
+const bool START_AT_GOAL = true;   // true = begin at the goal scoring the preload, false = full routine from the toggle
+
+// ---------- Tuning values ----------
+// Start (commented out for now)
+const double PIN_OFF_WALL_IN = 3;
+const double RETURN_TO_TOGGLE_IN = 2;
 const double TOGGLE_OUT_IN = 4;
 const double TOGGLE_BACK_IN = 7;
 const double SCORE_FWD_IN = 6;
 const double SCORE_BACK_IN = 15;
 
+// Preload score
+const double GOAL_START_FWD_IN = 1;    // forward drive before anything else when starting at the goal
+const double LIFT_UP_TOL = 60;         // how close to "fully up" before lowering
+const int    LIFT_UP_TIMEOUT_MS = 600; // max wait before lowering anyway
+const double SCOOT_IN = 1.5;
+const double CLEAR_GOAL_IN = 19;
+const double GOAL_HEADING_DEG = -90;   // heading at the goal
+
+// Second pin
+const double PIN2_TURN_DEG = -134;
+const double PIN2_REVERSE_IN = 26.5;
+const double PIN2_SLOW_LAST_IN = 12;
+const int    PIN2_SLOW_SPEED = 15;
+const int    PIN2_SETTLE_MS = 5;
+const double PIN2_RETURN_EXTRA_IN = 2;
+const double PIN2_SCORE_LIFT = 900;
+const double PIN2_LIFT_START_BEFORE_END_IN = 6;
+const double PIN2_BACK_EXTRA_IN = 2;
+const double PIN2_SCOOT_IN = 1;
+const double PIN2_CLEAR_IN = 11;
+const double PIN2_END_BACK1_IN = 16;
+const double PIN2_END_BACK2_IN = 18;
+
+// Third pin
+const double PIN3_TURN_DEG = -140;     // 50 degrees left of the -90 the swing ends at
 
 void CloseSideAuton() {
-  // Pull the pin off the wall, raise the lift, then return to the toggle
-  chassis.pid_drive_set(3_in, 85, true);
+  // ===== START: robot backed into the goal, aligned, pin in the claw, lift at rest =====
+  chassis.drive_angle_set(GOAL_HEADING_DEG * 1_deg);   // heading at the goal is -90
+  lift_set(LIFT_UP_SMALL);                             // lift up, as it is after the back-in
+  claw_vert.set(VERT_OUT);                             // vert out, as it is after the approach
+  chassis.pid_drive_set(GOAL_START_FWD_IN * 1_in, 85, true);   // forward 1 in before anything else
   chassis.pid_wait();
 
-  lift_set(LIFT_UP_SMALL);
-  lift_wait(300, 800);    // wait until the lift is within 300 degrees of the target (about 300 or higher),
-                          // or 0.8 seconds at most, so the pin is clear of the wall
+  // ===== 1. Pull the pin off the wall, raise the lift, return to the toggle (commented out) =====
+  // chassis.pid_drive_set(PIN_OFF_WALL_IN * 1_in, 85, true);
+  // chassis.pid_wait();
+  // lift_set(LIFT_UP_SMALL);
+  // lift_wait(300, 800);
+  // chassis.pid_drive_set(-RETURN_TO_TOGGLE_IN * 1_in, 85, true);
+  // chassis.pid_wait();
 
-  chassis.pid_drive_set(-2_in, 85, true);   // back to the toggle contact point
-  chassis.pid_wait();
+  // ===== 2. Toggles, twice (commented out) =====
+  // for (int i = 0; i < 2; i++) {
+  //   chassis.pid_drive_set(TOGGLE_OUT_IN * 1_in, 80, true);
+  //   chassis.pid_wait();
+  //   chassis.pid_drive_set(-TOGGLE_BACK_IN * 1_in, 110, false);
+  //   chassis.pid_wait();
+  // }
 
-  // Toggles: out and back, twice (unchanged)
-  for (int i = 0; i < 2; i++) { 
-    chassis.pid_drive_set(TOGGLE_OUT_IN * 1_in, 80, true);
-    chassis.pid_wait();
-    chassis.pid_drive_set(-TOGGLE_BACK_IN * 1_in, 110, false);
-    chassis.pid_wait();
-  }
+  // ===== 3a. Approach the goal (commented out) =====
+  // claw_vert.set(VERT_OUT);
+  // chassis.pid_drive_set(SCORE_FWD_IN * 1_in, 95, true);
+  // chassis.pid_wait_quick_chain();
+  // chassis.pid_swing_set(ez::RIGHT_SWING, -90_deg, 90);
+  // chassis.pid_wait();
+  // chassis.pid_drive_set(-SCORE_BACK_IN * 1_in, 95, true);
+  // chassis.pid_wait();
 
-  // Raise the lift a bit and release the vert
-  lift_set(LIFT_UP_SMALL);
-  claw_vert.set(VERT_OUT);
-
-  // Drive forward, then swing left as one blended motion
-  chassis.pid_drive_set(SCORE_FWD_IN * 1_in, 95, true);
-  chassis.pid_wait_quick_chain();
-  chassis.pid_swing_set(ez::RIGHT_SWING, -90_deg, 90);
-  chassis.pid_wait();
-
-  // Back into the goal with the lift fully up
-  chassis.pid_drive_set(-SCORE_BACK_IN * 1_in, 95, true);
-  chassis.pid_wait();
-  lift_wait();
-
-  // Scoot forward 1 inch while the lift goes down to rest, then release the claw
-  lift_set(LIFT_FLOOR);
-  chassis.pid_drive_set(3_in, 85, true);
+  // ===== 3b. Score the preload =====
+  lift_wait(LIFT_UP_TOL, LIFT_UP_TIMEOUT_MS);   // lift (nearly) fully up
+  lift_set(LIFT_FLOOR);                         // lift goes down while scooting forward
+  chassis.pid_drive_set(SCOOT_IN * 1_in, 85, true);
   chassis.pid_wait();
   claw.set(CLAW_OPEN);
   pros::delay(30);
-
-  // Forward 6 inches, and make sure the lift is down
-  chassis.pid_drive_set(9_in, 85, true);
+  chassis.pid_drive_set(CLEAR_GOAL_IN * 1_in, 85, true);
   chassis.pid_wait();
   lift_set(LIFT_FLOOR);
   lift_wait(40);
+
+  // ===== 4. Grab the second pin =====
+  chassis.pid_turn_set(PIN2_TURN_DEG * 1_deg, 90);   // left toward the pin
+  chassis.pid_wait();
+  chassis.pid_drive_set(-PIN2_REVERSE_IN * 1_in, 110, true);
+  chassis.pid_wait_until(-(PIN2_REVERSE_IN - PIN2_SLOW_LAST_IN) * 1_in);
+  chassis.pid_speed_max_set(PIN2_SLOW_SPEED);   // very slow for the last stretch into the pin
+  chassis.pid_wait();
+  claw.set(CLAW_CLOSED);
+  pros::delay(150);                         // let the claw close
+  lift_set(LIFT_PICKUP_CLEAR);              // up a bit so the pin doesn't drag
+  pros::delay(PIN2_SETTLE_MS);              // let the pin adjust
+
+  // ===== 5. Score the second pin: retrace the trip back into the goal =====
+  const double pin2_fwd_in = PIN2_REVERSE_IN + PIN2_RETURN_EXTRA_IN;
+  chassis.pid_drive_set(pin2_fwd_in * 1_in, 110, true);
+  chassis.pid_wait_until((pin2_fwd_in - PIN2_LIFT_START_BEFORE_END_IN) * 1_in);
+  lift_set(PIN2_SCORE_LIFT);                // start raising near the end of the forward drive
+  chassis.pid_wait();
+  chassis.pid_turn_set(GOAL_HEADING_DEG * 1_deg, 90);                // undo the left turn
+  chassis.pid_wait();
+  chassis.pid_drive_set(-(CLEAR_GOAL_IN + SCOOT_IN + PIN2_BACK_EXTRA_IN) * 1_in, 95, true);
+  chassis.pid_wait();
+  chassis.pid_drive_set(PIN2_SCOOT_IN * 1_in, 85, true);             // forward before lowering
+  chassis.pid_wait();
+  lift_set(LIFT_FLOOR);                     // lower to the floor
+  lift_wait(40, 800);
+  pros::delay(5);
+  claw.set(CLAW_OPEN);                      // release the pin
+  lift_set(LIFT_UP_SMALL);                  // raise back up
+  chassis.pid_drive_set(PIN2_CLEAR_IN * 1_in, 110, true);
+  chassis.pid_wait();
+  lift_set(LIFT_FLOOR);                     // lift back to rest after driving away
+
+  // ===== 6. Finish =====
+  chassis.pid_turn_set(-45_deg, 90);        // right 45
+  chassis.pid_wait();
+  chassis.pid_drive_set(-PIN2_END_BACK1_IN * 1_in, 110, true);
+  chassis.pid_wait();
+  lift_set(LIFT_FLOOR);                     // lift at rest before the swing turn
+  chassis.pid_swing_set(ez::LEFT_SWING, -90_deg, 90);   // left 45 in a swing turn
+  chassis.pid_wait();
+  chassis.pid_drive_set(-PIN2_END_BACK2_IN * 1_in, 80, true);
+  chassis.pid_wait();
+
+  // ===== 7. Grab the third pin =====
+  chassis.pid_turn_set(PIN3_TURN_DEG * 1_deg, 90);   // 50 degrees left, ready for the third pin
+  chassis.pid_wait();
+  chassis.pid_drive_set(-PIN2_REVERSE_IN * 1_in, 110, true);   // same distance as the second pin
+  chassis.pid_wait_until(-(PIN2_REVERSE_IN - PIN2_SLOW_LAST_IN) * 1_in);
+  chassis.pid_speed_max_set(PIN2_SLOW_SPEED);   // slow for the last stretch to pick it up smoothly
+  chassis.pid_wait();
+  claw.set(CLAW_CLOSED);
+  pros::delay(150);                         // let the claw close
+  lift_set(LIFT_PICKUP_CLEAR);              // up a bit so the pin doesn't drag
+  pros::delay(PIN2_SETTLE_MS);              // let the pin adjust
 }
+
